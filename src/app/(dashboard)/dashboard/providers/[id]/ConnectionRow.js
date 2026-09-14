@@ -260,11 +260,11 @@ export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst
             </div>
           )}
           {fastMode && (
-            <Tooltip text="Always overrides the client's service tier for this account. On sends service_tier: priority; off removes the client's service tier. Off by default.">
+            <Tooltip text="Uses the provider's faster processing mode for this account at a higher token cost. Off by default.">
               <button
                 type="button"
                 role="switch"
-                aria-label="Codex fast mode"
+                aria-label="Fast mode"
                 aria-checked={fastMode.on}
                 disabled={updatingFastMode}
                 onClick={handleToggleFastMode}

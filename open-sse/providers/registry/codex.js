@@ -34,11 +34,17 @@ export default {
     ],
     defaultMode: "auto",
   },
+  fastMode: {
+    request: {
+      field: "service_tier",
+      value: "priority",
+    },
+    pricingMultiplier: 2,
+  },
   transport: {
     baseUrl: "https://chatgpt.com/backend-api/codex/responses",
     format: "openai-responses",
     forceStream: true,
-    fastServiceTier: "priority",
     cliVersion: CODEX_CLI_VERSION,
     headers: {
       originator: "codex_cli_rs",

@@ -18,7 +18,7 @@ const SAFE_PSD_FIELDS = [
   "githubLogin", "githubName", "githubEmail", "githubUserId",
   "username", "firstName", "lastName", "authMethod", "authKind",
   "profileArn",
-  "codexFastMode",
+  "fastMode",
 ];
 
 const DEFAULT_PAGE_SIZE = 20;
