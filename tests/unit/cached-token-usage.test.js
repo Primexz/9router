@@ -206,6 +206,26 @@ describe("current provider pricing", () => {
       },
     });
   });
+
+  it("includes GPT-5.6 Luna long-context pricing", () => {
+    expect(MODEL_PRICING["gpt-5.6-luna"].long_context).toMatchObject({
+      threshold: 272000,
+      input: 0.4,
+      output: 1.8,
+      cached: 0.04,
+      cache_creation: 0.5,
+    });
+  });
+
+  it("includes Grok 4.6 long-context pricing", () => {
+    expect(MODEL_PRICING["grok-4.6"].long_context).toMatchObject({
+      threshold: 200000,
+      inclusive: true,
+      input: 4,
+      output: 12,
+      cached: 1,
+    });
+  });
 });
 
 describe("Anthropic streaming usage (message_start carries cache, message_delta output-only)", () => {
