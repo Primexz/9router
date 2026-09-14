@@ -39,6 +39,7 @@ export default {
     format: "openai-responses",
     forceStream: true,
     fastServiceTier: "priority",
+    fastPricingMultiplier: 2,
     cliVersion: CODEX_CLI_VERSION,
     headers: {
       originator: "codex_cli_rs",

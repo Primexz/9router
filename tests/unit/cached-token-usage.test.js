@@ -166,6 +166,14 @@ describe("calculateCostFromTokens (canonical inclusive convention)", () => {
     );
     expect(cost).toBeCloseTo((200000 * 4 + 1000 * 12) / 1_000_000, 12);
   });
+
+  it("applies a trusted request pricing multiplier", () => {
+    const cost = calculateCostFromTokens(
+      { prompt_tokens: 100, completion_tokens: 50, pricing_multiplier: 2 },
+      { input: 3, output: 15 }
+    );
+    expect(cost).toBeCloseTo(2 * (100 * 3 + 50 * 15) / 1_000_000, 12);
+  });
 });
 
 describe("Gemini reasoning usage", () => {

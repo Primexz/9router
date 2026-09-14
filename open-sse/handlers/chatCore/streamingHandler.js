@@ -111,7 +111,7 @@ export async function handleStreamingResponse({ providerResponse, provider, mode
 /**
  * Build onStreamComplete callback for streaming usage tracking.
  */
-export function buildOnStreamComplete({ provider, model, statisticsModel, connectionId, apiKey, requestStartTime, body, stream, finalBody, translatedBody, clientRawRequest, pxpipe, reqTag, log }) {
+export function buildOnStreamComplete({ provider, model, statisticsModel, connectionId, apiKey, requestStartTime, body, stream, finalBody, translatedBody, clientRawRequest, pxpipe, reqTag, log, pricingMultiplier }) {
   const recordedModel = statisticsModel || model;
   const streamDetailId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
@@ -138,7 +138,7 @@ export function buildOnStreamComplete({ provider, model, statisticsModel, connec
     });
 
     // Persist stream usage to DB (no console line; the "📊 done" line below is authoritative)
-    saveUsageStats({ provider, model: recordedModel, tokens: usage, connectionId, apiKey, endpoint: clientRawRequest?.endpoint, label: "STREAM USAGE", silent: true });
+    saveUsageStats({ provider, model: recordedModel, tokens: usage, connectionId, apiKey, endpoint: clientRawRequest?.endpoint, pricingMultiplier, label: "STREAM USAGE", silent: true });
     if (log?.line) log.line(reqTag, "📊", formatDoneLine({ usage, latency }));
   };
 

@@ -469,5 +469,6 @@ export function calculateCostFromTokens(tokens, pricing) {
     cost += cacheCreationTokens * ((effectivePricing.cache_creation || effectivePricing.input) / 1000000);
   }
 
-  return cost;
+  const pricingMultiplier = Number(tokens.pricing_multiplier);
+  return cost * (Number.isFinite(pricingMultiplier) && pricingMultiplier > 0 ? pricingMultiplier : 1);
 }
