@@ -477,8 +477,8 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     return createErrorResult(statusCode, errMsg, resetsAtMs);
   }
 
-  const pricingMultiplier = credentials?.providerSpecificData?.codexFastMode === true
-    ? executor.config.fastPricingMultiplier || 1
+  const pricingMultiplier = credentials?.providerSpecificData?.fastMode === true
+    ? executor.config.fastMode?.pricingMultiplier || 1
     : 1;
   const sharedCtx = { provider, model, statisticsModel, body, stream, translatedBody, finalBody, requestStartTime, connectionId, apiKey, clientRawRequest, onRequestSuccess, pxpipe: pxpipeSummary, reqTag, log, pricingMultiplier };
   const appendLog = (extra) => appendRequestLog({ model: statisticsModel, provider, connectionId, ...extra }).catch(() => { });

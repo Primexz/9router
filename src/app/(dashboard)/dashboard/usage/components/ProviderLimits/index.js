@@ -40,7 +40,7 @@ import {
 } from "./utils";
 import Card from "@/shared/components/Card";
 import { ConfirmModal, EditConnectionModal } from "@/shared/components";
-import { USAGE_SUPPORTED_PROVIDERS } from "@/shared/constants/providers";
+import { AI_PROVIDERS, USAGE_SUPPORTED_PROVIDERS } from "@/shared/constants/providers";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 
 // Maps the stored providerSpecificData.authMethod to a human label for Kiro.
@@ -423,7 +423,7 @@ export default function ProviderLimits() {
     [fetchConnections, page],
   );
 
-  const handleToggleCodexFastMode = useCallback(async (connection, enabled) => {
+  const handleToggleFastMode = useCallback(async (connection, enabled) => {
     if (fastModeUpdatingId) return;
 
     setFastModeUpdatingId(connection.id);
@@ -431,20 +431,20 @@ export default function ProviderLimits() {
       const response = await fetch(`/api/providers/${connection.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ providerSpecificData: { codexFastMode: enabled } }),
+        body: JSON.stringify({ providerSpecificData: { fastMode: enabled } }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Failed to save Codex fast mode");
+      if (!response.ok) throw new Error(data.error || "Failed to save fast mode");
 
       setConnections((previous) => previous.map((item) => item.id === connection.id ? {
         ...item,
         providerSpecificData: {
           ...item.providerSpecificData,
-          codexFastMode: enabled,
+          fastMode: enabled,
         },
       } : item));
     } catch (error) {
-      alert(error.message || "Failed to save Codex fast mode");
+      alert(error.message || "Failed to save fast mode");
     } finally {
       setFastModeUpdatingId(null);
     }
@@ -1206,16 +1206,16 @@ export default function ProviderLimits() {
                             <span className="material-symbols-outlined text-[17px]">schedule</span>
                           </button>
                         </Tooltip>
-                        <Tooltip text={`Fast mode is ${conn.providerSpecificData?.codexFastMode === true ? "on" : "off"}. Overrides this account's requests with service_tier: priority.`}>
+                        {AI_PROVIDERS[conn.provider]?.fastMode && <Tooltip text={`Fast mode is ${conn.providerSpecificData?.fastMode === true ? "on" : "off"}. Uses the provider's faster processing mode at a higher token cost.`}>
                           <button
                             type="button"
-                            onClick={() => handleToggleCodexFastMode(conn, conn.providerSpecificData?.codexFastMode !== true)}
+                            onClick={() => handleToggleFastMode(conn, conn.providerSpecificData?.fastMode !== true)}
                             disabled={isLoading || rowBusy}
                             role="switch"
-                            aria-label="Toggle Codex fast mode"
-                            aria-checked={conn.providerSpecificData?.codexFastMode === true}
+                            aria-label="Toggle fast mode"
+                            aria-checked={conn.providerSpecificData?.fastMode === true}
                             className={`flex h-8 min-w-14 items-center justify-center gap-1 rounded-lg border px-2 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                              conn.providerSpecificData?.codexFastMode === true
+                              conn.providerSpecificData?.fastMode === true
                                 ? "border-primary/30 bg-primary/10 text-primary"
                                 : "border-black/10 text-text-muted hover:bg-black/5 hover:text-primary dark:border-white/10 dark:hover:bg-white/5"
                             }`}
@@ -1225,7 +1225,7 @@ export default function ProviderLimits() {
                             </span>
                             <span>Fast</span>
                           </button>
-                        </Tooltip>
+                        </Tooltip>}
                       </>
                     )}
                     {AUTO_PING_SETTINGS_KEYS[conn.provider] && conn.authType === "oauth" && (

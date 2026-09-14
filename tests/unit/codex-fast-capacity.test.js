@@ -20,14 +20,17 @@ describe("Codex fast tier and capacity handling", () => {
       input: "hi",
       reasoning_effort: "max",
       service_tier: "fast",
-    }, true, { providerSpecificData: { codexFastMode: true } });
+    }, true, { providerSpecificData: { fastMode: true } });
 
     expect(body.service_tier).toBe("priority");
     expect(body.reasoning.effort).toBe("xhigh");
   });
 
-  it("prices Codex fast mode at twice the standard token rates", () => {
-    expect(PROVIDERS.codex.fastPricingMultiplier).toBe(2);
+  it("exposes generic fast-mode request and pricing metadata", () => {
+    expect(PROVIDERS.codex.fastMode).toEqual({
+      request: { field: "service_tier", value: "priority" },
+      pricingMultiplier: 2,
+    });
   });
 
   it("uses ChatGPT workspace header fallback", () => {

@@ -487,8 +487,9 @@ export class CodexExecutor extends BaseExecutor {
     delete body.safety_identifier; // Droid CLI sends this but Codex doesn't support it
     delete body.previous_response_id; // store=false → backend can't resolve previous resp; avoid 404
 
-    if (credentials?.providerSpecificData?.codexFastMode === true) {
-      body.service_tier = this.config.fastServiceTier;
+    const fastModeRequest = this.config.fastMode?.request;
+    if (credentials?.providerSpecificData?.fastMode === true && fastModeRequest?.field) {
+      body[fastModeRequest.field] = fastModeRequest.value;
     } else {
       delete body.service_tier;
     }
