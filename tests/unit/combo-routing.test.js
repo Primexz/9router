@@ -149,6 +149,49 @@ describe("combo dynamic routing", () => {
     )).toMatchObject({ tier: "REASONING", cause: "literal_keyword_match", matchedKeyword: "production incident" });
   });
 
+  it("routes agent housekeeping prompts to the cheapest tier", () => {
+    const prompt = [
+      "You are coming up with a succinct title for a coding session",
+      "The session discusses distributed architecture, concurrency, database performance, and optimization.",
+    ].join("\n");
+    const body = { messages: [{ role: "user", content: prompt }] };
+
+    expect(classifyRequestComplexity(body)).toMatchObject({
+      tier: "SIMPLE",
+      score: null,
+      cause: "housekeeping",
+      signals: ["housekeeping"],
+      matchedKeyword: "You are coming up with a succinct title for a coding session",
+    });
+    expect(routeModelsByComplexity(models, body).models[0]).toBe("provider/fast");
+  });
+
+  it("supports custom housekeeping patterns and lets keyword rules take precedence", () => {
+    const body = { messages: [{ role: "user", content: "Generate a session label for this architecture discussion" }] };
+    const config = { housekeepingPatterns: ["Generate a session label"] };
+
+    expect(classifyRequestComplexity(body, config).cause).toBe("housekeeping");
+    expect(classifyRequestComplexity(body, { ...config, routeHousekeepingToCheapestTier: false }).cause)
+      .toBe("heuristic_scorer");
+    expect(classifyRequestComplexity(body, {
+      ...config,
+      keywordTierRules: [{ keywords: ["session label"], tier: "COMPLEX" }],
+    })).toMatchObject({ tier: "COMPLEX", cause: "literal_keyword_match" });
+  });
+
+  it("matches housekeeping only on the newest ask", () => {
+    const body = {
+      messages: [
+        { role: "user", content: "Write the title in the predominant language of the session" },
+        { role: "assistant", content: "Routing work" },
+        { role: "user", content: "Implement and refactor a distributed architecture with concurrency constraints." },
+      ],
+    };
+
+    expect(classifyRequestComplexity(body).cause).toBe("heuristic_scorer");
+    expect(classifyRequestComplexity(body).tier).toBe("COMPLEX");
+  });
+
   it("supports configurable boundaries and explicit one-tier escalation", () => {
     const body = { messages: [{ role: "user", content: "Implement a function" }] };
     expect(classifyRequestComplexity(body, { tierBoundaries: { simple_medium: 0.25 } }).tier).toBe("SIMPLE");

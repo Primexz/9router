@@ -40,6 +40,10 @@ const DEFAULT_WEIGHTS = {
 const DEFAULT_BOUNDARIES = { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.60 };
 const DEFAULT_TOKEN_THRESHOLDS = { simple: 15, complex: 400 };
 const DEFAULT_ESCALATION_KEYWORDS = ["9ROUTER ESCALATE", "LITELLM ESCALATE"];
+const DEFAULT_HOUSEKEEPING_PATTERNS = [
+  "Write the title in the predominant language of the session",
+  "You are coming up with a succinct title for a coding session",
+];
 const MULTI_STEP_PATTERNS = [
   /\bfirst\b[\s\S]*\bthen\b/i,
   /\b(?:step|phase)\s+\d+\b/i,
@@ -105,6 +109,11 @@ function normalizedConfig(config = {}) {
     technicalKeywords: [...(config.technicalKeywords || DEFAULT_TECHNICAL_KEYWORDS), ...(config.customTechnicalKeywords || [])],
     simpleKeywords: config.simpleKeywords || DEFAULT_SIMPLE_KEYWORDS,
     escalationKeywords: config.escalationKeywords || DEFAULT_ESCALATION_KEYWORDS,
+    housekeepingPatterns: [
+      ...DEFAULT_HOUSEKEEPING_PATTERNS,
+      ...(Array.isArray(config.housekeepingPatterns) ? config.housekeepingPatterns : []),
+    ],
+    routeHousekeepingToCheapestTier: config.routeHousekeepingToCheapestTier !== false,
     keywordTierRules: Array.isArray(config.keywordTierRules) ? config.keywordTierRules : [],
   };
 }
@@ -193,6 +202,9 @@ export function classifyRequestComplexity(body = {}, config = {}) {
   const override = overrides.length > 0
     ? overrides.sort((left, right) => COMPLEXITY_TIERS.indexOf(right.rule.tier) - COMPLEXITY_TIERS.indexOf(left.rule.tier))[0]
     : null;
+  const housekeepingPattern = !override && resolved.routeHousekeepingToCheapestTier
+    ? resolved.housekeepingPatterns.find((pattern) => pattern && ask.includes(pattern))
+    : null;
 
   const estimatedTokens = Math.floor(ask.length / 4);
   const tokenScore = estimatedTokens < resolved.tokenThresholds.simple ? -1 : estimatedTokens > resolved.tokenThresholds.complex ? 1 : 0;
@@ -209,11 +221,11 @@ export function classifyRequestComplexity(body = {}, config = {}) {
     { name: "questionComplexity", score: questionComplexity, signal: questionComplexity ? "multiple questions" : null },
   ];
   const score = dimensions.reduce((total, dimension) => total + dimension.score * (resolved.weights[dimension.name] || 0), 0);
-  let tier = override?.rule.tier || (score < resolved.boundaries.simple_medium ? "SIMPLE"
+  let tier = override?.rule.tier || (housekeepingPattern ? "SIMPLE" : (score < resolved.boundaries.simple_medium ? "SIMPLE"
     : score < resolved.boundaries.medium_complex ? "MEDIUM"
-      : score < resolved.boundaries.complex_reasoning ? "COMPLEX" : "REASONING");
-  let cause = override ? "literal_keyword_match" : "heuristic_scorer";
-  if (!override && reasoning.matches.length >= 2 && score >= resolved.boundaries.simple_medium) {
+      : score < resolved.boundaries.complex_reasoning ? "COMPLEX" : "REASONING"));
+  let cause = override ? "literal_keyword_match" : housekeepingPattern ? "housekeeping" : "heuristic_scorer";
+  if (!override && !housekeepingPattern && reasoning.matches.length >= 2 && score >= resolved.boundaries.simple_medium) {
     tier = "REASONING";
     cause = "reasoning_override";
   }
@@ -224,15 +236,15 @@ export function classifyRequestComplexity(body = {}, config = {}) {
 
   return {
     tier,
-    score: override ? null : score,
+    score: override || housekeepingPattern ? null : score,
     cause,
     signals: [
-      ...dimensions.map((dimension) => dimension.signal).filter(Boolean),
+      ...(housekeepingPattern ? ["housekeeping"] : dimensions.map((dimension) => dimension.signal).filter(Boolean)),
       ...(escalationKeyword ? ["escalation"] : []),
       ...(stalled ? ["stall_escalation"] : []),
     ],
     escalationKeyword: escalationKeyword || null,
-    matchedKeyword: override?.match || null,
+    matchedKeyword: override?.match || housekeepingPattern || null,
     ask,
   };
 }
