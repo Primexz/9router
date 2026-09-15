@@ -6,6 +6,7 @@ import { checkFallbackError, formatRetryAfter } from "./accountFallback.js";
 import { unavailableResponse } from "../utils/error.js";
 import { getCapabilitiesForModel } from "../providers/capabilities.js";
 import { extractTextContent } from "../translator/formats/gemini.js";
+import { resetComplexitySessionPins, routeModelsByComplexity } from "./complexityRouter.js";
 
 // Hard capabilities = input modalities; missing one drops request data (e.g. image
 // stripped). Must be prioritized. Soft (e.g. search) only degrades a feature.
@@ -241,8 +242,13 @@ export function getRotatedModels(models, comboName, strategy, stickyLimit = 1) {
  * @param {string} [comboName] - Combo name to reset; omit to clear all
  */
 export function resetComboRotation(comboName) {
-  if (comboName) comboRotationState.delete(comboName);
-  else comboRotationState.clear();
+  if (comboName) {
+    comboRotationState.delete(comboName);
+    resetComplexitySessionPins(comboName);
+  } else {
+    comboRotationState.clear();
+    resetComplexitySessionPins();
+  }
 }
 
 /**
@@ -277,9 +283,19 @@ export function getComboModelsFromData(modelStr, combosData) {
  * @param {number|string} [options.comboStickyLimit=1] - Requests per combo model before switching
  * @returns {Promise<Response>}
  */
-export async function handleComboChat({ body, models, handleSingleModel, log, comboName, comboStrategy, comboStickyLimit = 1, autoSwitch = true }) {
+export async function handleComboChat({ body, models, handleSingleModel, log, comboName, comboStrategy, comboStickyLimit = 1, complexityConfig, autoSwitch = true }) {
   // Apply rotation strategy if enabled
   let rotatedModels = getRotatedModels(models, comboName, comboStrategy, comboStickyLimit);
+
+  if (comboStrategy === "dynamic") {
+    const routed = routeModelsByComplexity(rotatedModels, body, complexityConfig);
+    rotatedModels = routed.models;
+    const score = routed.decision.score === null ? "override" : routed.decision.score.toFixed(3);
+    log.info("COMBO", `dynamic route (${routed.decision.tier}, score: ${score}, cause: ${routed.decision.cause}) → ${rotatedModels[0]}`, {
+      signals: routed.decision.signals,
+      matchedKeyword: routed.decision.matchedKeyword,
+    });
+  }
 
   // Auto-switch: float models that satisfy the request's required capabilities to the front.
   if (autoSwitch) {

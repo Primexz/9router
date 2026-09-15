@@ -134,7 +134,8 @@ export async function handleChat(request, clientRawRequest = null) {
       log,
       comboName: modelStr,
       comboStrategy,
-      comboStickyLimit
+      comboStickyLimit,
+      complexityConfig: { ...comboStrategies[modelStr]?.complexityConfig, routerName: modelStr },
     });
   }
 
@@ -211,7 +212,8 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
         log,
         comboName: modelStr,
         comboStrategy,
-        comboStickyLimit
+        comboStickyLimit,
+        complexityConfig: { ...comboStrategies[modelStr]?.complexityConfig, routerName: modelStr },
       });
     }
     log.warn("CHAT", "Invalid model format", { model: modelStr });
