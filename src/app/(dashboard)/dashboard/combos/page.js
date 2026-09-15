@@ -204,6 +204,7 @@ export default function CombosPage() {
           <ul className="text-sm text-text-muted mt-2 flex flex-col gap-1">
             <li><span className="font-medium text-text-main">Fallback</span> — tries models in order (next on failure)</li>
             <li><span className="font-medium text-text-main">Round Robin</span> — rotates models across requests to spread load</li>
+            <li><span className="font-medium text-text-main">Dynamic</span> — routes simple requests to the first model and promotes complex work through the ordered model tiers</li>
             <li><span className="font-medium text-text-main">Fusion</span> — queries all models in parallel, then a judge synthesizes one answer. Best quality, but costs the most: every request bills all panel models + the judge (N+1 calls)</li>
           </ul>
         </div>
@@ -291,20 +292,39 @@ export default function CombosPage() {
 const STRATEGY_OPTIONS = [
   { value: "fallback", label: "Fallback — try in order" },
   { value: "round-robin", label: "Round Robin — rotate" },
+  { value: "dynamic", label: "Dynamic — route by complexity" },
   { value: "fusion", label: "Fusion — panel + judge" },
 ];
+
+const DYNAMIC_TIERS = [
+  { key: "SIMPLE", label: "Simple", range: "Below 0.15", icon: "bolt", color: "text-emerald-500 bg-emerald-500/10" },
+  { key: "MEDIUM", label: "Medium", range: "0.15 – 0.35", icon: "speed", color: "text-blue-500 bg-blue-500/10" },
+  { key: "COMPLEX", label: "Complex", range: "0.35 – 0.60", icon: "psychology", color: "text-amber-500 bg-amber-500/10" },
+  { key: "REASONING", label: "Reasoning", range: "0.60 and above", icon: "neurology", color: "text-purple-500 bg-purple-500/10" },
+];
+
+const DEFAULT_DYNAMIC_BOUNDARIES = { simple_medium: 0.15, medium_complex: 0.35, complex_reasoning: 0.60 };
+
+function defaultTierModels(models) {
+  if (!models.length) return {};
+  return Object.fromEntries(DYNAMIC_TIERS.map((tier, index) => [
+    tier.key,
+    models[Math.min(models.length - 1, Math.ceil((index / (DYNAMIC_TIERS.length - 1)) * (models.length - 1)))],
+  ]));
+}
 
 function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdit, onDelete, strategy = {}, onSetStrategy }) {
   const [showJudgeSelect, setShowJudgeSelect] = useState(false);
   const current = strategy.fallbackStrategy || "fallback";
   const judge = strategy.judgeModel || "";
   const isFusion = current === "fusion";
+  const isDynamic = current === "dynamic";
 
   return (
     <Card padding="sm" className="group">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
-          <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 sm:mt-0.5">
             <span className="material-symbols-outlined text-primary text-[18px]">layers</span>
           </div>
           <div className="min-w-0 flex-1">
@@ -347,13 +367,20 @@ function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdi
                 )}
               </div>
             )}
+            {isDynamic && (
+              <DynamicTierEditor
+                models={combo.models}
+                config={strategy.complexityConfig || {}}
+                onChange={(complexityConfig) => onSetStrategy({ complexityConfig })}
+              />
+            )}
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 sm:shrink-0">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start sm:gap-3 sm:shrink-0">
           {/* Strategy selector — always visible */}
-          <div className="w-full sm:w-[200px]">
+          <div className="w-full sm:w-[260px]">
             <Select
               options={STRATEGY_OPTIONS}
               value={current}
@@ -406,6 +433,123 @@ function ComboCard({ combo, getCaps, activeProviders = [], copied, onCopy, onEdi
         />
       )}
     </Card>
+  );
+}
+
+function DynamicTierEditor({ models, config, onChange }) {
+  const [expanded, setExpanded] = useState(false);
+  const defaults = defaultTierModels(models);
+  const tiers = { ...defaults, ...(config.tiers || {}) };
+  const boundaries = { ...DEFAULT_DYNAMIC_BOUNDARIES, ...(config.tierBoundaries || {}) };
+  const modelOptions = models.map((model) => ({ value: model, label: model }));
+  const patch = (value) => onChange({ ...config, ...value });
+  const updateTier = (tier, model) => patch({ tiers: { ...tiers, [tier]: model } });
+  const updateBoundary = (name, value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    const next = { ...boundaries, [name]: parsed };
+    if (!(next.simple_medium < next.medium_complex && next.medium_complex < next.complex_reasoning)) return;
+    patch({ tierBoundaries: next });
+  };
+
+  const ranges = {
+    SIMPLE: `Below ${boundaries.simple_medium}`,
+    MEDIUM: `${boundaries.simple_medium} – ${boundaries.medium_complex}`,
+    COMPLEX: `${boundaries.medium_complex} – ${boundaries.complex_reasoning}`,
+    REASONING: `${boundaries.complex_reasoning} and above`,
+  };
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border border-primary/20 bg-primary/[0.025]">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-primary/5"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="material-symbols-outlined text-[17px] text-primary">route</span>
+          <span>
+            <span className="block text-xs font-semibold text-text-main">Complexity tiers</span>
+            <span className="block text-[10px] text-text-muted">The scorer picks a tier, then routes to its assigned model.</span>
+          </span>
+        </span>
+        <span className="material-symbols-outlined text-[18px] text-text-muted">{expanded ? "expand_less" : "expand_more"}</span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-primary/10 p-3">
+          <div className="grid gap-2 lg:grid-cols-2">
+            {DYNAMIC_TIERS.map((tier) => (
+              <div key={tier.key} className="rounded-lg border border-border bg-surface p-2.5">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <span className={`flex size-7 items-center justify-center rounded-md ${tier.color}`}>
+                      <span className="material-symbols-outlined text-[16px]">{tier.icon}</span>
+                    </span>
+                    <span>
+                      <span className="block text-xs font-semibold">{tier.label}</span>
+                      <span className="block font-mono text-[10px] text-text-muted">Score {ranges[tier.key]}</span>
+                    </span>
+                  </span>
+                  {config.tiers?.[tier.key] && config.tiers[tier.key] !== defaults[tier.key] && (
+                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">Custom</span>
+                  )}
+                </div>
+                <Select
+                  options={modelOptions}
+                  value={tiers[tier.key] || ""}
+                  onChange={(event) => updateTier(tier.key, event.target.value)}
+                  placeholder="Choose model"
+                  selectClassName="py-1.5 font-mono text-xs"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 rounded-lg border border-border bg-surface p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold">Score boundaries</p>
+                <p className="text-[10px] text-text-muted">Tune where requests move to a stronger tier.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => patch({ tiers: defaults, tierBoundaries: DEFAULT_DYNAMIC_BOUNDARIES })}
+                className="text-[10px] font-medium text-primary hover:underline"
+              >
+                Reset defaults
+              </button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {[
+                ["simple_medium", "Simple → Medium"],
+                ["medium_complex", "Medium → Complex"],
+                ["complex_reasoning", "Complex → Reasoning"],
+              ].map(([key, label]) => (
+                <Input
+                  key={key}
+                  label={label}
+                  type="number"
+                  min="-1"
+                  max="1"
+                  step="0.01"
+                  value={boundaries[key]}
+                  onChange={(event) => updateBoundary(key, event.target.value)}
+                  inputClassName="py-1.5 font-mono text-xs"
+                />
+              ))}
+            </div>
+            <label className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2">
+              <span>
+                <span className="block text-xs font-medium">Session affinity</span>
+                <span className="block text-[10px] text-text-muted">Keep a session on its current model unless complexity increases.</span>
+              </span>
+              <Toggle checked={config.sessionAffinity === true} onChange={(sessionAffinity) => patch({ sessionAffinity })} />
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
