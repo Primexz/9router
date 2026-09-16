@@ -658,6 +658,33 @@ export async function getUsageStats(period = "all") {
   return stats;
 }
 
+export async function getTokenActivity() {
+  const db = await getAdapter();
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - 364);
+  const rows = db.all(
+    `SELECT dateKey, data FROM usageDaily WHERE dateKey >= ? AND dateKey <= ?`,
+    [getLocalDateKey(start), getLocalDateKey(today)]
+  );
+  const totals = new Map(rows.map((row) => {
+    const day = parseJson(row.data, {});
+    return [row.dateKey, (day.promptTokens || 0) + (day.completionTokens || 0)];
+  }));
+  const days = Array.from({ length: 365 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(date.getDate() + index);
+    const dateKey = getLocalDateKey(date);
+    return { date: dateKey, tokens: totals.get(dateKey) || 0 };
+  });
+  return {
+    days,
+    totalTokens: days.reduce((total, day) => total + day.tokens, 0),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
+}
+
 export async function getChartData(period = "7d") {
   const db = await getAdapter();
   const now = Date.now();
