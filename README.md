@@ -1,6 +1,48 @@
 > [!NOTE]
 > This repository is a fork of [decolua/9router](https://github.com/decolua/9router) with my additions, mainly focused on GitHub Copilot and OpenAI Codex.
 
+## Fork Additions
+
+The following changes are included in this fork's `master` branch, on top of the upstream project.
+
+### GitHub Copilot
+
+- **AI Credits tracking:** Show GitHub-reported credit consumption, billing mode, remaining allowances, and reset dates. Credit consumption is displayed separately from budget percentages, including for unlimited organization plans. Hide redundant unlimited request rows and unallocated premium quotas without hiding exhausted allowances.
+- **Per-connection credit limits:** Configure an optional **AI Credits limit per billing period** in the connection editor, with a dedicated local-limit row in the quota tracker. Blank disables the limit; zero blocks requests. Configured limits block requests when usage cannot be verified.
+- **Cached credit checks:** Share concurrent usage lookups and cache results for 30 seconds per credential and proxy, configurable through `GITHUB_CREDIT_USAGE_CACHE_TTL_MS`. Limits use GitHub's total reported usage, not just traffic through this router; reporting delays, caching, and concurrent requests mean this is not a guaranteed hard spending cap.
+- **Auto model selection:** Expose `gh/auto` in static and live model catalogs, let Copilot choose the concrete model, and reuse account/conversation selection sessions. Usage statistics, request details, and estimated costs are attributed to the selected model rather than the `auto` alias.
+
+See the [quota tracking guide](gitbook/content/en/features/quota-tracking.md#github-copilot-ai-credits) for credit-limit behavior and configuration.
+
+### OpenAI Codex
+
+- **Per-account Fast mode:** Enable priority processing from the provider dashboard. The implementation uses a generic `fastMode` setting with provider-defined request overrides and pricing multipliers; Codex sends `service_tier: "priority"` when enabled.
+- **Fast-mode cost estimates:** Apply Codex's configured 2× pricing multiplier to recorded usage across streaming and non-streaming requests instead of estimating priority requests at standard rates.
+- **Correct quota windows:** Classify quotas using the API's reported duration instead of assuming the primary window is always five hours. Weekly-only accounts display **Weekly**, while accounts with both windows retain both. The same handling applies to review and Spark quotas, with positional fallback when duration metadata is missing or unrecognized.
+
+### Usage Dashboard
+
+- **All Time history:** Add an **All Time** period to usage statistics and charts. Historical chart data is grouped into continuous monthly buckets, including months without usage.
+- **Animated live totals:** Animate request, token, and estimated-cost totals as they change, with reduced-motion support.
+
+### Pricing and Token Accounting
+
+- **Provider pricing corrections:** Update the bundled Claude Sonnet, GPT, Gemini, and Grok pricing entries and aliases used for cost estimates.
+- **Long-context pricing:** Apply model-specific higher-context tiers when input crosses the configured thresholds, including GPT-5.6 Luna and Grok 4.6.
+- **Reasoning-token accounting:** Treat completion-token totals as reasoning-inclusive so reasoning tokens are not charged twice.
+
+### Integrated Community Fixes
+
+This fork also includes fixes authored by other contributors:
+
+- **Real-time usage overview** (MiQieR): Refresh overview-card totals through server-sent events instead of requiring a page reload.
+- **Faster model discovery** (Hasan Langarizadeh): Cache `/v1/models` for 30 seconds with background refresh, reuse in-flight builds, and retain a usable catalog after failed refreshes. Exact-model lookups refresh on cache misses.
+- **Prompt-cache identity** (Óscar Fonseca): Preserve `prompt_cache_key` through Responses/Chat translation while filtering it from translated Chat requests to providers that do not declare support.
+- **Optional tool parameters** (Felix Förtsch): Preserve optional parameters and explicit `strict` settings across Responses and Codex translation without rewriting required-field lists.
+- **Request-scoped error handling** (RaoYu): Avoid cooling down healthy accounts for unmatched request-scoped 4xx errors, while retaining account, quota, and rate-limit handling.
+
+---
+
 <div align="center">
   <img src="./images/9router.png?1" alt="9Router Dashboard" width="800"/>
   
