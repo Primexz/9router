@@ -77,6 +77,7 @@ export function buildRequestDetail(base, overrides = {}) {
     providerResponse: base.providerResponse || null,
     response: base.response || {},
     pxpipe: base.pxpipe || undefined,
+    fastMode: base.fastMode === true,
     status: base.status || "success",
     ...overrides
   };
@@ -100,7 +101,7 @@ export function formatDoneLine({ usage, latency }) {
   return `DONE ${latency?.total ?? 0}ms${ttftStr} · ${inStr} · OUT ${outTok}`;
 }
 
-export function saveUsageStats({ provider, model, tokens, connectionId, apiKey, endpoint, pricingMultiplier = 1, label = "USAGE", silent = false }) {
+export function saveUsageStats({ provider, model, tokens, connectionId, apiKey, endpoint, pricingMultiplier = 1, fastMode = false, label = "USAGE", silent = false }) {
   if (!tokens || typeof tokens !== "object") return;
 
   const inTokens = tokens.input_tokens ?? tokens.prompt_tokens ?? 0;
@@ -128,6 +129,7 @@ export function saveUsageStats({ provider, model, tokens, connectionId, apiKey, 
     tokens: normalized,
     timestamp: new Date().toISOString(),
     connectionId: connectionId || undefined,
+    mode: fastMode ? "fast" : "standard",
     apiKey: apiKey || undefined,
     endpoint: endpoint || null
   }).catch(() => {});

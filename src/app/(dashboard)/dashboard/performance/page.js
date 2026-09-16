@@ -75,7 +75,7 @@ function ComparisonTable({ groups }) {
               <tr key={row.key} className="hover:bg-bg-subtle">
                 <th scope="row" className="max-w-[260px] px-4 py-3 text-left font-medium">
                   <div className="truncate" title={group === "account" ? row.accountName : row.model}>{group === "provider" ? providerName(row.provider) : group === "model" ? row.model : row.accountName}</div>
-                  <div className="text-xs font-normal text-text-muted">{group !== "provider" && `${providerName(row.provider)} · `}{integer(row.ttftSamples)} TTFT samples</div>
+                  <div className="text-xs font-normal text-text-muted">{group !== "provider" && `${providerName(row.provider)} · `}{group === "model" && `${row.mode === "fast" ? "Fast" : row.mode === "standard" ? "Standard" : "Unknown mode"} · `}{integer(row.ttftSamples)} TTFT samples</div>
                 </th>
                 {columns.map((column) => <td key={column.field} className={`px-4 py-3 text-right tabular-nums ${column.field === "errors" && row.errors ? "text-error" : ""}`}>{column.format(row[column.field])}</td>)}
               </tr>
@@ -97,11 +97,12 @@ export default function PerformancePage() {
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
   const [account, setAccount] = useState("");
+  const [mode, setMode] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [refresh, setRefresh] = useState(0);
   const [latencyView, setLatencyView] = useState("ttft");
-  const query = new URLSearchParams({ period, provider, model, connectionId: account }).toString();
+  const query = new URLSearchParams({ period, provider, model, connectionId: account, mode }).toString();
   const data = result?.query === query ? result.data : null;
   const currentError = error?.query === query ? error.message : null;
 
@@ -142,7 +143,7 @@ export default function PerformancePage() {
           <Button variant="secondary" size="sm" icon="refresh" onClick={() => setRefresh((value) => value + 1)}>Refresh</Button>
         </div>
       </div>
-      <Card padding="sm" className="grid gap-3 sm:grid-cols-3">
+      <Card padding="sm" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="flex min-w-0 flex-col gap-1.5 text-xs text-text-muted">Provider
           <select className={selectClass} value={provider} onChange={(event) => { setProvider(event.target.value); setModel(""); setAccount(""); }}><option value="">All providers</option>{providers.map((id) => <option key={id} value={id}>{providerName(id)}</option>)}</select>
         </label>
@@ -151,6 +152,9 @@ export default function PerformancePage() {
         </label>
         <label className="flex min-w-0 flex-col gap-1.5 text-xs text-text-muted">Account
           <select className={selectClass} value={account} onChange={(event) => setAccount(event.target.value)}><option value="">All accounts</option>{accounts.map((option) => <option key={option.connectionId} value={option.connectionId}>{option.accountName || option.connectionId} · {providerName(option.provider)}</option>)}</select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1.5 text-xs text-text-muted">Processing mode
+          <select className={selectClass} value={mode} onChange={(event) => setMode(event.target.value)}><option value="">All modes</option><option value="standard">Standard</option><option value="fast">Fast</option><option value="unknown">Unknown (historical)</option></select>
         </label>
       </Card>
       {currentError && <div role="alert" className="rounded-lg border border-error/30 bg-error/5 p-3 text-sm text-error">{currentError}{data && " Showing the last successful refresh."}</div>}

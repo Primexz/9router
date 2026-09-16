@@ -25,18 +25,20 @@ describe("fast-mode usage pricing", () => {
     expect(cost).toBeCloseTo(2 * (100 * 3 + 50 * 15) / 1_000_000, 12);
   });
 
-  it("persists the pricing multiplier with canonical usage", () => {
+  it("persists the fast mode and pricing multiplier with canonical usage", () => {
     saveUsageStats({
       provider: "codex",
       model: "gpt-5.6-sol",
       tokens: { input_tokens: 100, output_tokens: 50 },
       pricingMultiplier: 2,
+      fastMode: true,
       silent: true,
     });
 
     expect(saveRequestUsage).toHaveBeenCalledWith(expect.objectContaining({
       provider: "codex",
       model: "gpt-5.6-sol",
+      mode: "fast",
       tokens: expect.objectContaining({
         prompt_tokens: 100,
         completion_tokens: 50,

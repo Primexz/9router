@@ -28,6 +28,7 @@ export function normalizePerformanceSample(detail) {
     provider: detail.provider || "unknown",
     model: detail.model || "unknown",
     connectionId: detail.connectionId || null,
+    mode: detail.fastMode === true ? "fast" : detail.fastMode === false ? "standard" : "unknown",
     outcome,
     httpStatus,
     latencyMs: latencyMs > 0 && outcome !== "pending" ? latencyMs : null,
@@ -116,7 +117,7 @@ export function buildPerformanceDashboard(samples, period, now = new Date()) {
     buckets.get(hourly ? String(date.getTime()) : dayKey(date))?.samples.push(sample);
     const keys = {
       provider: sample.provider,
-      model: JSON.stringify([sample.provider, sample.model]),
+      model: JSON.stringify([sample.provider, sample.model, sample.mode]),
       account: JSON.stringify([sample.provider, sample.connectionId]),
     };
     for (const [dimension, key] of Object.entries(keys)) {
@@ -136,6 +137,7 @@ export function buildPerformanceDashboard(samples, period, now = new Date()) {
       provider: entries[0].provider,
       model: entries[0].model,
       connectionId: entries[0].connectionId,
+      mode: entries[0].mode,
       accountName: entries[0].accountName || entries[0].connectionId || "Unassigned",
       ...summarizePerformance(entries),
     })).sort((left, right) => right.attempts - left.attempts)])),

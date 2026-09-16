@@ -6,7 +6,7 @@ let lastCleanup = 0;
 
 function writeSample(db, sample, replace = true) {
   if (!sample) return;
-  const columns = ["id", "timestamp", "provider", "model", "connectionId", "outcome", "httpStatus", "latencyMs", "ttftMs", "outputTokens"];
+  const columns = ["id", "timestamp", "provider", "model", "connectionId", "mode", "outcome", "httpStatus", "latencyMs", "ttftMs", "outputTokens"];
   db.run(
     `INSERT INTO performanceSamples (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")}) ON CONFLICT(id) DO ${replace ? `UPDATE SET ${columns.slice(1).map((column) => `${column} = excluded.${column}`).join(", ")}` : "NOTHING"}`,
     columns.map((column) => sample[column])
@@ -29,7 +29,7 @@ export async function savePerformanceSample(detail) {
   });
 }
 
-export async function getPerformanceDashboard({ period = "24h", provider = "", model = "", connectionId = "" } = {}) {
+export async function getPerformanceDashboard({ period = "24h", provider = "", model = "", connectionId = "", mode = "" } = {}) {
   const db = await getAdapter();
   const now = new Date();
   const retentionStart = performanceStart(`${PERFORMANCE_RETENTION_DAYS}d`, now).toISOString();
@@ -44,7 +44,7 @@ export async function getPerformanceDashboard({ period = "24h", provider = "", m
   });
   const conditions = ["samples.timestamp >= ?", "samples.timestamp <= ?"];
   const params = [performanceStart(period, now).toISOString(), now.toISOString()];
-  for (const [column, value] of [["provider", provider], ["model", model], ["connectionId", connectionId]]) {
+  for (const [column, value] of [["provider", provider], ["model", model], ["connectionId", connectionId], ["mode", mode]]) {
     if (value) { conditions.push(`samples.${column} = ?`); params.push(value); }
   }
   const where = conditions.join(" AND ");
@@ -56,7 +56,7 @@ export async function getPerformanceDashboard({ period = "24h", provider = "", m
     [...params, PERFORMANCE_SAMPLE_LIMIT]
   );
   const options = db.all(
-    `SELECT DISTINCT samples.provider, samples.model, samples.connectionId, connections.name AS accountName
+    `SELECT DISTINCT samples.provider, samples.model, samples.connectionId, samples.mode, connections.name AS accountName
      FROM performanceSamples samples LEFT JOIN providerConnections connections ON samples.connectionId = connections.id
      WHERE samples.timestamp >= ? AND samples.timestamp <= ? ORDER BY samples.provider, samples.model`,
     [retentionStart, now.toISOString()]
