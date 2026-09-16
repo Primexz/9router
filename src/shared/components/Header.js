@@ -84,6 +84,13 @@ const getPageInfo = (pathname) => {
       icon: "layers",
       breadcrumbs: [],
     };
+  if (pathname.includes("/performance"))
+    return {
+      title: "Performance & Reliability",
+      description: "Understand response speed, failures, and account health",
+      icon: "monitoring",
+      breadcrumbs: [],
+    };
   if (pathname.includes("/usage"))
     return {
       title: "Usage & Analytics",

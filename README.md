@@ -26,6 +26,13 @@ See the [quota tracking guide](gitbook/content/en/features/quota-tracking.md#git
 - **Animated live totals:** Animate request, token, and estimated-cost totals as they change, with reduced-motion support.
 - **Token activity heatmap:** Show the last 365 days of input and output token usage in a contribution-style calendar. Hover, focus, or tap a day for its exact token total. Includes activity intensity, active-day counts, and automatic refresh; daily totals use the server's timezone and remain independent of the overview period filter.
 
+### Performance and Reliability
+
+- **Dedicated dashboard:** Open **Performance** directly below Usage in the sidebar. Filter recorded chat attempts by period, provider, model, and account.
+- **Latency and throughput:** Inspect median/p95 time to first token, p95 total duration, median streaming output speed, time-series charts, and sortable comparisons. Missing or non-streaming first-token measurements are excluded, not treated as zero.
+- **Reliability:** Review recorded-attempt success rates, failure categories, cancellations, and recent errors. Pending/unknown outcomes are separate, and retries are not conflated with unique user requests.
+- **Metadata-only history:** Keep performance samples for 90 days without enabling prompt logging. Existing retained request details are imported when available. Views use at most the newest 50,000 matching attempts and clearly indicate when the selection is truncated. Refreshes run every 30 seconds; retry/fallback rates and unreported failures are not inferred.
+
 ### Pricing and Token Accounting
 
 - **Provider pricing corrections:** Update the bundled Claude Sonnet, GPT, Gemini, and Grok pricing entries and aliases used for cost estimates.
