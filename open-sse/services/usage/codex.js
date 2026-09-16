@@ -3,6 +3,7 @@
  */
 
 import { proxyAwareFetch } from "../../utils/proxyFetch.js";
+import { CODEX_QUOTA_WINDOW_TYPES } from "../../config/codexQuotaConstants.js";
 import { U, parseResetTime, toFiniteNumber } from "./shared.js";
 
 // Codex (OpenAI) API config
@@ -58,12 +59,11 @@ function appendCodexQuotaWindows(quotas, prefix, snapshot) {
   const secondary = rateLimit.secondary_window || rateLimit.secondary || snapshot.secondary_window || snapshot.secondary;
   let added = false;
 
-  if (primary) {
-    quotas[prefix ? `${prefix}_session` : "session"] = formatCodexWindow(primary);
-    added = true;
-  }
-  if (secondary) {
-    quotas[prefix ? `${prefix}_weekly` : "weekly"] = formatCodexWindow(secondary);
+  for (const [window, fallbackType] of [[primary, "session"], [secondary, "weekly"]]) {
+    if (!window) continue;
+    const duration = toFiniteNumber(window.limit_window_seconds, 0);
+    const quotaType = CODEX_QUOTA_WINDOW_TYPES[duration] || fallbackType;
+    quotas[prefix ? `${prefix}_${quotaType}` : quotaType] = formatCodexWindow(window);
     added = true;
   }
 
