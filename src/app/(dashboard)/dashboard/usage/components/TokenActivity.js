@@ -48,9 +48,12 @@ export default function TokenActivity() {
       }
     }
     refresh();
+    const reload = () => refresh();
+    window.addEventListener("timezonechange", reload);
     return () => {
       controller.abort();
       clearTimeout(timer);
+      window.removeEventListener("timezonechange", reload);
     };
   }, []);
 

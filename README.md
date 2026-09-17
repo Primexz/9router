@@ -22,9 +22,10 @@ See the [quota tracking guide](gitbook/content/en/features/quota-tracking.md#git
 
 ### Usage Dashboard
 
+- **Global timezone selector:** Choose and search for an IANA timezone from the dashboard header. Usage statistics, charts, token activity, and performance metrics consistently use the selected timezone.
 - **All Time history:** Add an **All Time** period to usage statistics and charts. Historical chart data is grouped into continuous monthly buckets, including months without usage.
 - **Animated live totals:** Animate request, token, and estimated-cost totals as they change, with reduced-motion support.
-- **Token activity heatmap:** Show the last 365 days of input and output token usage in a contribution-style calendar. Hover, focus, or tap a day for its exact token total. Includes activity intensity, active-day counts, and automatic refresh; daily totals use the server's timezone and remain independent of the overview period filter.
+- **Token activity heatmap:** Show the last 365 days of input and output token usage in a contribution-style calendar. Hover, focus, or tap a day for its exact token total. Includes activity intensity, active-day counts, and automatic refresh; daily totals use the selected timezone and remain independent of the overview period filter.
 
 ### Performance and Reliability
 

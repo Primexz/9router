@@ -44,6 +44,8 @@ export default function UsageChart({ period = "7d" }) {
 
   useEffect(() => {
     fetchData();
+    window.addEventListener("timezonechange", fetchData);
+    return () => window.removeEventListener("timezonechange", fetchData);
   }, [fetchData]);
 
   const hasData = data.some((d) => d.tokens > 0 || d.cost > 0);

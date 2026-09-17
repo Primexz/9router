@@ -1,3 +1,5 @@
+import { addDaysToDateKey, formatInTimeZone, getDateKey, normalizeTimeZone, startOfDateKeyInTimeZone } from "../shared/utils/timeZone.js";
+
 export const PERFORMANCE_RETENTION_DAYS = 90;
 export const PERFORMANCE_SAMPLE_LIMIT = 50000;
 export const PERFORMANCE_PERIODS = ["today", "24h", "7d", "30d", "90d"];
@@ -37,15 +39,12 @@ export function normalizePerformanceSample(detail) {
   };
 }
 
-export function performanceStart(period, now = new Date()) {
-  const start = new Date(now);
-  if (period === "today") start.setHours(0, 0, 0, 0);
-  else if (period === "24h") start.setTime(start.getTime() - 86400000);
-  else {
-    start.setDate(start.getDate() - (Number.parseInt(period, 10) - 1));
-    start.setHours(0, 0, 0, 0);
-  }
-  return start;
+export function performanceStart(period, now = new Date(), requestedTimeZone = "UTC") {
+  const timeZone = normalizeTimeZone(requestedTimeZone);
+  if (period === "24h") return new Date(now.getTime() - 86400000);
+  const days = period === "today" ? 0 : Number.parseInt(period, 10) - 1;
+  const startKey = addDaysToDateKey(getDateKey(now, timeZone), -days);
+  return startOfDateKeyInTimeZone(startKey, timeZone);
 }
 
 function percentile(values, fraction) {
@@ -89,12 +88,9 @@ export function failureCategory(sample) {
   return "Unclassified error";
 }
 
-function dayKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-export function buildPerformanceDashboard(samples, period, now = new Date()) {
-  const start = performanceStart(period, now);
+export function buildPerformanceDashboard(samples, period, now = new Date(), requestedTimeZone = "UTC") {
+  const timeZone = normalizeTimeZone(requestedTimeZone);
+  const start = performanceStart(period, now, timeZone);
   const hourly = period === "today" || period === "24h";
   const groups = { provider: new Map(), model: new Map(), account: new Map() };
   const failures = new Map();
@@ -102,10 +98,10 @@ export function buildPerformanceDashboard(samples, period, now = new Date()) {
   const cursor = new Date(start);
   if (hourly) cursor.setMinutes(0, 0, 0);
   while (cursor <= now) {
-    const key = hourly ? String(cursor.getTime()) : dayKey(cursor);
+    const key = hourly ? String(cursor.getTime()) : getDateKey(cursor, timeZone);
     buckets.set(key, {
       timestamp: cursor.toISOString(),
-      label: cursor.toLocaleString("en-US", hourly ? { hour: "numeric", minute: "2-digit" } : { month: "short", day: "numeric" }),
+      label: formatInTimeZone(cursor, timeZone, hourly ? { hour: "numeric", minute: "2-digit" } : { month: "short", day: "numeric" }),
       samples: [],
     });
     if (hourly) cursor.setTime(cursor.getTime() + 3600000);
@@ -113,8 +109,8 @@ export function buildPerformanceDashboard(samples, period, now = new Date()) {
   }
   for (const sample of samples) {
     const date = new Date(sample.timestamp);
-    if (hourly) date.setMinutes(0, 0, 0);
-    buckets.get(hourly ? String(date.getTime()) : dayKey(date))?.samples.push(sample);
+    const hourlyKey = String(start.getTime() + Math.floor((date.getTime() - start.getTime()) / 3600000) * 3600000);
+    buckets.get(hourly ? hourlyKey : getDateKey(date, timeZone))?.samples.push(sample);
     const keys = {
       provider: sample.provider,
       model: JSON.stringify([sample.provider, sample.model, sample.mode]),

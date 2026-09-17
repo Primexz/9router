@@ -122,7 +122,9 @@ export default function PerformancePage() {
       }
     }
     load();
-    return () => { controller.abort(); clearTimeout(timer); };
+    const reload = () => setRefresh((value) => value + 1);
+    window.addEventListener("timezonechange", reload);
+    return () => { controller.abort(); clearTimeout(timer); window.removeEventListener("timezonechange", reload); };
   }, [query, refresh]);
 
   const options = result?.data?.options || [];
@@ -139,7 +141,7 @@ export default function PerformancePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SegmentedControl options={PERIODS} value={period} onChange={setPeriod} size="sm" />
         <div className="flex items-center gap-3 text-xs text-text-muted">
-          {data && <span>Updated {new Date(data.updatedAt).toLocaleTimeString()} · Every 30s</span>}
+          {data && <span>Updated {new Date(data.updatedAt).toLocaleTimeString(undefined, { timeZone: data.timeZone })} · Every 30s</span>}
           <Button variant="secondary" size="sm" icon="refresh" onClick={() => setRefresh((value) => value + 1)}>Refresh</Button>
         </div>
       </div>

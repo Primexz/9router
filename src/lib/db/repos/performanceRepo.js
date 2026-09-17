@@ -29,10 +29,10 @@ export async function savePerformanceSample(detail) {
   });
 }
 
-export async function getPerformanceDashboard({ period = "24h", provider = "", model = "", connectionId = "", mode = "" } = {}) {
+export async function getPerformanceDashboard({ period = "24h", provider = "", model = "", connectionId = "", mode = "", timeZone = "UTC" } = {}) {
   const db = await getAdapter();
   const now = new Date();
-  const retentionStart = performanceStart(`${PERFORMANCE_RETENTION_DAYS}d`, now).toISOString();
+  const retentionStart = performanceStart(`${PERFORMANCE_RETENTION_DAYS}d`, now, timeZone).toISOString();
   const legacy = db.all(
     `SELECT details.id, details.data FROM requestDetails details LEFT JOIN performanceSamples samples ON samples.id = details.id
      WHERE samples.id IS NULL AND details.timestamp >= ? AND details.timestamp <= ? ORDER BY details.timestamp DESC LIMIT 1000`,
@@ -43,7 +43,7 @@ export async function getPerformanceDashboard({ period = "24h", provider = "", m
     pruneSamples(db, now);
   });
   const conditions = ["samples.timestamp >= ?", "samples.timestamp <= ?"];
-  const params = [performanceStart(period, now).toISOString(), now.toISOString()];
+  const params = [performanceStart(period, now, timeZone).toISOString(), now.toISOString()];
   for (const [column, value] of [["provider", provider], ["model", model], ["connectionId", connectionId], ["mode", mode]]) {
     if (value) { conditions.push(`samples.${column} = ?`); params.push(value); }
   }
@@ -62,7 +62,7 @@ export async function getPerformanceDashboard({ period = "24h", provider = "", m
     [retentionStart, now.toISOString()]
   );
   return {
-    ...buildPerformanceDashboard(samples, period, now),
+    ...buildPerformanceDashboard(samples, period, now, timeZone),
     options,
     coverage: {
       retainedSince: db.get("SELECT MIN(timestamp) AS timestamp FROM performanceSamples WHERE timestamp >= ?", [retentionStart])?.timestamp || null,
@@ -72,7 +72,7 @@ export async function getPerformanceDashboard({ period = "24h", provider = "", m
       truncated: total > samples.length,
       retentionDays: PERFORMANCE_RETENTION_DAYS,
     },
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone,
     updatedAt: now.toISOString(),
   };
 }

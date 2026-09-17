@@ -3,6 +3,7 @@ import { getSettings, updateSettings } from "@/lib/localDb";
 import { applyOutboundProxyEnv } from "@/lib/network/outboundProxy";
 import { resetComboRotation } from "open-sse/services/combo.js";
 import bcrypt from "bcryptjs";
+import { isValidTimeZone } from "@/shared/utils/timeZone";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,6 +42,10 @@ export async function PATCH(request) {
 
     // Strip protected secrets before any internal handling sets them
     for (const key of PROTECTED_SETTING_KEYS) delete body[key];
+
+    if (Object.prototype.hasOwnProperty.call(body, "timeZone") && !isValidTimeZone(body.timeZone)) {
+      return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+    }
 
     // If updating password, hash it
     if (body.newPassword) {

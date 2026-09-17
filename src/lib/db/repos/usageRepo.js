@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { getAdapter } from "../driver.js";
 import { parseJson, stringifyJson } from "../helpers/jsonCol.js";
 import { getMeta, setMeta } from "../helpers/metaStore.js";
+import { addDaysToDateKey, formatInTimeZone, getDateKey, normalizeTimeZone, startOfDateKeyInTimeZone, startOfDayInTimeZone } from "../../../shared/utils/timeZone.js";
 
 function maskApiKey(key) {
   if (!key || typeof key !== "string") return null;
@@ -354,7 +355,8 @@ function loadDaysInRange(adapter, maxDays) {
   return adapter.all(`SELECT dateKey, data FROM usageDaily WHERE dateKey >= ?`, [cutoffKey]);
 }
 
-export async function getUsageStats(period = "all") {
+export async function getUsageStats(period = "all", requestedTimeZone = "UTC") {
+  const timeZone = normalizeTimeZone(requestedTimeZone);
   const db = await getAdapter();
 
   const [{ getProviderConnections }, { getApiKeys }, { getProviderNodes }] = await Promise.all([
@@ -454,7 +456,8 @@ export async function getUsageStats(period = "all") {
     }
   }
 
-  const useDailySummary = period !== "24h" && period !== "today";
+  // Stored daily summaries use the server timezone; selected-timezone views must aggregate raw timestamps.
+  const useDailySummary = false;
 
   if (useDailySummary) {
     const periodDays = { "7d": 7, "30d": 30, "60d": 60 };
@@ -575,14 +578,18 @@ export async function getUsageStats(period = "all") {
       if (stats.byEndpoint[endpointKey] && new Date(ts) > new Date(stats.byEndpoint[endpointKey].lastUsed)) stats.byEndpoint[endpointKey].lastUsed = ts;
     }
   } else {
-    // 24h / today: live history
+    // Aggregate raw timestamps so day boundaries follow the selected timezone.
     let cutoff;
     if (period === "today") {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      cutoff = startOfDay.toISOString();
-    } else {
+      cutoff = startOfDayInTimeZone(new Date(), timeZone).toISOString();
+    } else if (period === "24h") {
       cutoff = new Date(Date.now() - PERIOD_MS["24h"]).toISOString();
+    } else if (period === "all") {
+      cutoff = new Date(0).toISOString();
+    } else {
+      const days = { "7d": 7, "30d": 30, "60d": 60 }[period] || 7;
+      const approximateStart = new Date(Date.now() - (days - 1) * 86400000);
+      cutoff = startOfDayInTimeZone(approximateStart, timeZone).toISOString();
     }
     const filtered = db.all(
       `SELECT timestamp, provider, model, connectionId, apiKey, endpoint, promptTokens, completionTokens, cost, tokens FROM usageHistory WHERE timestamp >= ?`,
@@ -669,45 +676,43 @@ export async function getUsageStats(period = "all") {
   return stats;
 }
 
-export async function getTokenActivity() {
+export async function getTokenActivity(requestedTimeZone = "UTC") {
   const db = await getAdapter();
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  const start = new Date(today);
-  start.setDate(start.getDate() - 364);
+  const timeZone = normalizeTimeZone(requestedTimeZone);
+  const todayKey = getDateKey(new Date(), timeZone);
+  const startKey = addDaysToDateKey(todayKey, -364);
+  const start = startOfDateKeyInTimeZone(startKey, timeZone);
   const rows = db.all(
-    `SELECT dateKey, data FROM usageDaily WHERE dateKey >= ? AND dateKey <= ?`,
-    [getLocalDateKey(start), getLocalDateKey(today)]
+    `SELECT timestamp, promptTokens, completionTokens FROM usageHistory WHERE timestamp >= ?`,
+    [start.toISOString()]
   );
-  const totals = new Map(rows.map((row) => {
-    const day = parseJson(row.data, {});
-    return [row.dateKey, (day.promptTokens || 0) + (day.completionTokens || 0)];
-  }));
+  const totals = new Map();
+  for (const row of rows) {
+    const key = getDateKey(row.timestamp, timeZone);
+    totals.set(key, (totals.get(key) || 0) + (row.promptTokens || 0) + (row.completionTokens || 0));
+  }
   const days = Array.from({ length: 365 }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(date.getDate() + index);
-    const dateKey = getLocalDateKey(date);
+    const dateKey = addDaysToDateKey(startKey, index);
     return { date: dateKey, tokens: totals.get(dateKey) || 0 };
   });
   return {
     days,
     totalTokens: days.reduce((total, day) => total + day.tokens, 0),
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone,
   };
 }
 
-export async function getChartData(period = "7d") {
+export async function getChartData(period = "7d", requestedTimeZone = "UTC") {
   const db = await getAdapter();
+  const timeZone = normalizeTimeZone(requestedTimeZone);
   const now = Date.now();
 
   if (period === "today") {
     const bucketCount = 24;
     const bucketMs = 3600000;
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const startTime = startOfDay.getTime();
-    const endTime = startTime + bucketCount * bucketMs;
-    const labelFn = (ts) => new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const startTime = startOfDayInTimeZone(new Date(), timeZone).getTime();
+    const endTime = startOfDayInTimeZone(new Date(startTime + 36 * bucketMs), timeZone).getTime();
+    const labelFn = (ts) => formatInTimeZone(ts, timeZone, { hour: "2-digit", minute: "2-digit", hour12: false });
     const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0 }));
 
     const rows = db.all(
@@ -717,7 +722,7 @@ export async function getChartData(period = "7d") {
     for (const r of rows) {
       const t = new Date(r.timestamp).getTime();
       if (t < startTime || t >= endTime) continue;
-      const idx = Math.floor((t - startTime) / bucketMs);
+      const idx = Number(new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(new Date(t)));
       if (idx >= 0 && idx < bucketCount) {
         buckets[idx].tokens += (r.promptTokens || 0) + (r.completionTokens || 0);
         buckets[idx].cost += r.cost || 0;
@@ -729,7 +734,7 @@ export async function getChartData(period = "7d") {
   if (period === "24h") {
     const bucketCount = 24;
     const bucketMs = 3600000;
-    const labelFn = (ts) => new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const labelFn = (ts) => formatInTimeZone(ts, timeZone, { hour: "2-digit", minute: "2-digit", hour12: false });
     const startTime = now - bucketCount * bucketMs;
     const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0 }));
 
@@ -748,39 +753,41 @@ export async function getChartData(period = "7d") {
   }
 
   const bucketCount = period === "7d" ? 7 : period === "30d" ? 30 : 60;
-  if (period === "all") return getAllTimeChartData(db);
-  const today = new Date();
-  const labelFn = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-  // Build map of dateKey → day data
-  const dayRows = loadDaysInRange(db, bucketCount);
+  if (period === "all") return getAllTimeChartData(db, timeZone);
+  const todayKey = getDateKey(new Date(), timeZone);
+  const startKey = addDaysToDateKey(todayKey, -(bucketCount - 1));
+  const start = startOfDateKeyInTimeZone(startKey, timeZone);
+  const rows = db.all(
+    `SELECT timestamp, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ?`,
+    [start.toISOString()]
+  );
   const dayMap = {};
-  for (const r of dayRows) dayMap[r.dateKey] = parseJson(r.data, {});
-
-  return Array.from({ length: bucketCount }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (bucketCount - 1 - i));
-    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const dayData = dayMap[dateKey];
+  for (const row of rows) {
+    const key = getDateKey(row.timestamp, timeZone);
+    dayMap[key] ||= { tokens: 0, cost: 0 };
+    dayMap[key].tokens += (row.promptTokens || 0) + (row.completionTokens || 0);
+    dayMap[key].cost += row.cost || 0;
+  }
+  return Array.from({ length: bucketCount }, (_, index) => {
+    const dateKey = addDaysToDateKey(startKey, index);
+    const bucket = dayMap[dateKey] || { tokens: 0, cost: 0 };
     return {
-      label: labelFn(d),
-      tokens: dayData ? (dayData.promptTokens || 0) + (dayData.completionTokens || 0) : 0,
-      cost: dayData ? (dayData.cost || 0) : 0,
+      label: formatInTimeZone(startOfDateKeyInTimeZone(dateKey, timeZone), timeZone, { month: "short", day: "numeric" }),
+      ...bucket,
     };
   });
 }
 
-function getAllTimeChartData(adapter) {
-  const dayRows = loadDaysInRange(adapter, null);
-  if (!dayRows.length) return [];
+function getAllTimeChartData(adapter, timeZone) {
+  const rows = adapter.all(`SELECT timestamp, promptTokens, completionTokens, cost FROM usageHistory ORDER BY timestamp ASC`);
+  if (!rows.length) return [];
 
   const monthMap = {};
-  for (const row of dayRows) {
-    const day = parseJson(row.data, {});
-    const monthKey = row.dateKey.slice(0, 7);
+  for (const row of rows) {
+    const monthKey = getDateKey(row.timestamp, timeZone).slice(0, 7);
     if (!monthMap[monthKey]) monthMap[monthKey] = { tokens: 0, cost: 0 };
-    monthMap[monthKey].tokens += (day.promptTokens || 0) + (day.completionTokens || 0);
-    monthMap[monthKey].cost += day.cost || 0;
+    monthMap[monthKey].tokens += (row.promptTokens || 0) + (row.completionTokens || 0);
+    monthMap[monthKey].cost += row.cost || 0;
   }
 
   const monthKeys = Object.keys(monthMap).sort();

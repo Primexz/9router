@@ -297,7 +297,12 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
 
     es.onerror = () => setLoading(false);
 
-    return () => es.close();
+    const reload = () => window.location.reload();
+    window.addEventListener("timezonechange", reload);
+    return () => {
+      es.close();
+      window.removeEventListener("timezonechange", reload);
+    };
   }, [period]);
 
   const toggleSort = useCallback((tableType, field) => {
