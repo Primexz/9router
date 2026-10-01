@@ -65,6 +65,7 @@ export const MODEL_PRICING = {
   "gpt-5.6-sol":                  { input: 4.00,  output: 20.00, cached: 0.40,  reasoning: 20.00,  cache_creation: 5.00, long_context: { threshold: 272000, input: 8.00, output: 30.00, cached: 0.80, reasoning: 30.00, cache_creation: 10.00 } },
   "gpt-6-astra":                  { input: 10.00, output: 50.00, cached: 1.00,  reasoning: 50.00,  cache_creation: 12.50, long_context: { threshold: 272000, input: 20.00, output: 75.00, cached: 2.00, reasoning: 75.00, cache_creation: 25.00 } },
   "gpt-6-sol":                    { input: 2.00,  output: 10.00, cached: 0.20,  reasoning: 10.00,  cache_creation: 2.50, long_context: { threshold: 272000, input: 4.00, output: 15.00, cached: 0.40, reasoning: 15.00, cache_creation: 5.00 } },
+  "gpt-6.1-sol":                  { input: 2.00,  output: 10.00, cached: 0.10,  reasoning: 10.00,  cache_creation: 2.50, long_context: { threshold: 272000, input: 4.00, output: 15.00, cached: 0.40, reasoning: 15.00, cache_creation: 5.00 } }, 
   "gpt-6-luna":                   { input: 0.10,  output: 0.50,  cached: 0.01,  reasoning: 0.50,   cache_creation: 0.125, long_context: { threshold: 272000, input: 0.20, output: 0.75, cached: 0.02, reasoning: 0.75, cache_creation: 0.25 } },
   "o1":                           { input: 15.00, output: 60.00, cached: 7.50,  reasoning: 90.00,  cache_creation: 15.00 },
   "o1-mini":                      { input: 3.00,  output: 12.00, cached: 1.50,  reasoning: 18.00,  cache_creation: 3.00  },
