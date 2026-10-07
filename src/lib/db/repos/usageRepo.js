@@ -6,8 +6,9 @@ import { addDaysToDateKey, formatInTimeZone, getDateKey, normalizeTimeZone, star
 
 function maskApiKey(key) {
   if (!key || typeof key !== "string") return null;
-  if (key.length <= 8) return key.charAt(0) + "***";
-  return key.slice(0, 8) + "***";
+  if (key.length <= 12) return key.charAt(0) + "***";
+  // Keep the tail: keys sharing a machine-id prefix (team keys) must not collide.
+  return key.slice(0, 8) + "***" + key.slice(-4);
 }
 
 const PENDING_TIMEOUT_MS = 60 * 1000;
@@ -347,12 +348,12 @@ export async function getUsageHistory(filter = {}) {
 
 function loadDaysInRange(adapter, maxDays) {
   if (maxDays == null) {
-    return adapter.all(`SELECT dateKey, data FROM usageDaily`);
+    return adapter.all(`SELECT dateKey, data FROM usageDaily ORDER BY dateKey ASC`);
   }
   const today = new Date();
   const cutoff = new Date(today.getFullYear(), today.getMonth(), today.getDate() - maxDays + 1);
   const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
-  return adapter.all(`SELECT dateKey, data FROM usageDaily WHERE dateKey >= ?`, [cutoffKey]);
+  return adapter.all(`SELECT dateKey, data FROM usageDaily WHERE dateKey >= ? ORDER BY dateKey ASC`, [cutoffKey]);
 }
 
 export async function getUsageStats(period = "all", requestedTimeZone = "UTC") {
@@ -551,8 +552,15 @@ export async function getUsageStats(period = "all", requestedTimeZone = "UTC") {
       }
     }
 
-    // Overlay precise lastUsed timestamps from history
-    const overlayCutoff = maxDays ? Date.now() - maxDays * 86400000 : 0;
+    // Overlay precise lastUsed timestamps from history.
+    // ponytail: overlay scans only a recent window; entries older than that keep
+    // day-level lastUsed from usageDaily. Upgrade to a materialized per-key
+    // MAX(timestamp) table if exact old timestamps ever matter.
+    const OVERLAY_WINDOW_MS = 2 * 86400000;
+    const overlayCutoff = Math.max(
+      maxDays ? Date.now() - maxDays * 86400000 : 0,
+      Date.now() - OVERLAY_WINDOW_MS
+    );
     const histRows = db.all(
       `SELECT timestamp, provider, model, connectionId, apiKey, endpoint FROM usageHistory WHERE timestamp >= ?`,
       [new Date(overlayCutoff).toISOString()]
@@ -645,7 +653,9 @@ export async function getUsageStats(period = "all", requestedTimeZone = "UTC") {
         const keyInfo = apiKeyMap[r.apiKey];
         const keyName = keyInfo?.name || r.apiKey.slice(0, 8) + "...";
         const apiKeyMasked = maskApiKey(r.apiKey);
-        const akKey = `${apiKeyMasked}|${r.model}|${r.provider || "unknown"}`;
+        // Key by the FULL api key (same as the daily rollup + lastUsed overlay)
+        // — masking here collided all keys sharing a prefix into one bucket.
+        const akKey = `${r.apiKey}|${r.model}|${r.provider || "unknown"}`;
         if (!stats.byApiKey[akKey]) {
           stats.byApiKey[akKey] = { requests: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cost: 0, rawModel: r.model, provider: providerDisplayName, apiKeyMasked, keyName, apiKeyKey: apiKeyMasked, lastUsed: r.timestamp };
         }
@@ -713,7 +723,7 @@ export async function getChartData(period = "7d", requestedTimeZone = "UTC") {
     const startTime = startOfDayInTimeZone(new Date(), timeZone).getTime();
     const endTime = startOfDayInTimeZone(new Date(startTime + 36 * bucketMs), timeZone).getTime();
     const labelFn = (ts) => formatInTimeZone(ts, timeZone, { hour: "2-digit", minute: "2-digit", hour12: false });
-    const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0 }));
+    const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0, requests: 0 }));
 
     const rows = db.all(
       `SELECT timestamp, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ?`,
@@ -726,6 +736,7 @@ export async function getChartData(period = "7d", requestedTimeZone = "UTC") {
       if (idx >= 0 && idx < bucketCount) {
         buckets[idx].tokens += (r.promptTokens || 0) + (r.completionTokens || 0);
         buckets[idx].cost += r.cost || 0;
+        buckets[idx].requests += 1;
       }
     }
     return buckets;
@@ -736,7 +747,7 @@ export async function getChartData(period = "7d", requestedTimeZone = "UTC") {
     const bucketMs = 3600000;
     const labelFn = (ts) => formatInTimeZone(ts, timeZone, { hour: "2-digit", minute: "2-digit", hour12: false });
     const startTime = now - bucketCount * bucketMs;
-    const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0 }));
+    const buckets = Array.from({ length: bucketCount }, (_, i) => ({ label: labelFn(startTime + i * bucketMs), tokens: 0, cost: 0, requests: 0 }));
 
     const rows = db.all(
       `SELECT timestamp, promptTokens, completionTokens, cost FROM usageHistory WHERE timestamp >= ?`,
@@ -748,6 +759,7 @@ export async function getChartData(period = "7d", requestedTimeZone = "UTC") {
       const idx = Math.min(Math.floor((t - startTime) / bucketMs), bucketCount - 1);
       buckets[idx].tokens += (r.promptTokens || 0) + (r.completionTokens || 0);
       buckets[idx].cost += r.cost || 0;
+      buckets[idx].requests += 1;
     }
     return buckets;
   }
@@ -764,13 +776,14 @@ export async function getChartData(period = "7d", requestedTimeZone = "UTC") {
   const dayMap = {};
   for (const row of rows) {
     const key = getDateKey(row.timestamp, timeZone);
-    dayMap[key] ||= { tokens: 0, cost: 0 };
+    dayMap[key] ||= { tokens: 0, cost: 0, requests: 0 };
     dayMap[key].tokens += (row.promptTokens || 0) + (row.completionTokens || 0);
     dayMap[key].cost += row.cost || 0;
+    dayMap[key].requests += 1;
   }
   return Array.from({ length: bucketCount }, (_, index) => {
     const dateKey = addDaysToDateKey(startKey, index);
-    const bucket = dayMap[dateKey] || { tokens: 0, cost: 0 };
+    const bucket = dayMap[dateKey] || { tokens: 0, cost: 0, requests: 0 };
     return {
       label: formatInTimeZone(startOfDateKeyInTimeZone(dateKey, timeZone), timeZone, { month: "short", day: "numeric" }),
       ...bucket,
@@ -785,9 +798,10 @@ function getAllTimeChartData(adapter, timeZone) {
   const monthMap = {};
   for (const row of rows) {
     const monthKey = getDateKey(row.timestamp, timeZone).slice(0, 7);
-    if (!monthMap[monthKey]) monthMap[monthKey] = { tokens: 0, cost: 0 };
+    if (!monthMap[monthKey]) monthMap[monthKey] = { tokens: 0, cost: 0, requests: 0 };
     monthMap[monthKey].tokens += (row.promptTokens || 0) + (row.completionTokens || 0);
     monthMap[monthKey].cost += row.cost || 0;
+    monthMap[monthKey].requests += 1;
   }
 
   const monthKeys = Object.keys(monthMap).sort();
@@ -799,8 +813,8 @@ function getAllTimeChartData(adapter, timeZone) {
   const end = new Date(now.getFullYear(), now.getMonth(), 1);
   while (cursor <= end) {
     const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
-    const bucket = monthMap[key] || { tokens: 0, cost: 0 };
-    result.push({ label: labelFn(cursor.getFullYear(), cursor.getMonth()), tokens: bucket.tokens, cost: bucket.cost });
+    const bucket = monthMap[key] || { tokens: 0, cost: 0, requests: 0 };
+    result.push({ label: labelFn(cursor.getFullYear(), cursor.getMonth()), tokens: bucket.tokens, cost: bucket.cost, requests: bucket.requests });
     cursor.setMonth(cursor.getMonth() + 1);
   }
   return result;
