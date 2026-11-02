@@ -39,9 +39,6 @@ jobs:
           echo "name=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
           echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -67,7 +64,8 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64,linux/arm64
+          # ARM64 builds are temporarily disabled.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
