@@ -16,7 +16,7 @@ jobs:
   publish:
     # The upstream repository has its own release publishing workflow.
     if: github.repository != 'decolua/9router'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 90
     permissions:
       contents: read
@@ -25,6 +25,11 @@ jobs:
     steps:
       - name: Check out fork
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
 
       - name: Resolve image name and app version
         id: image

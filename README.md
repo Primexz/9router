@@ -13,7 +13,7 @@ The **Publish Fork Image to GHCR** GitHub Actions workflow builds Linux AMD64 an
 docker pull ghcr.io/primexz/9router:latest
 ```
 
-GitHub Actions must be enabled for this fork. To allow unauthenticated pulls, set the GHCR package's visibility to public after its first publication.
+GitHub Actions must be enabled for this fork, with a self-hosted Linux runner (labels `self-hosted` and `linux`) that has Docker installed and accessible to the runner user. The workflow sets up Node.js, QEMU, and Docker Buildx. To allow unauthenticated pulls, set the GHCR package's visibility to public after its first publication.
 
 ### GitHub Copilot
 
