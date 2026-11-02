@@ -7,7 +7,7 @@ The following changes are included in this fork's `master` branch, on top of the
 
 ### Fork Docker image
 
-The **Publish Fork Image to GHCR** GitHub Actions workflow builds Linux AMD64 and ARM64 images on every push to `master`, and can also be run manually from the Actions tab. It publishes to `ghcr.io/primexz/9router` using the built-in `GITHUB_TOKEN`; no registry secrets are required. Images receive a `sha-<full-commit>` tag and a branch tag. Builds from `master` also update `latest`. Tagged releases continue to use the existing release workflow.
+The **Publish Fork Image to GHCR** GitHub Actions workflow builds Linux AMD64 and ARM64 images on every push to `master`, and can also be run manually from the Actions tab. It publishes to `ghcr.io/primexz/9router` using the built-in `GITHUB_TOKEN`; no registry secrets are required. Images receive a `sha-<full-commit>` tag and a branch tag. Builds from `master` also update `latest`. This is the only enabled GitHub Actions workflow in this fork; documentation, tray binaries, and upstream tagged-release publishing are disabled.
 
 ```bash
 docker pull ghcr.io/primexz/9router:latest
