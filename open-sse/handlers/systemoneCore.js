@@ -1,7 +1,27 @@
 import { createErrorResult, parseUpstreamError, formatProviderError } from "../utils/error.js";
 import { HTTP_STATUS, FETCH_CONNECT_TIMEOUT_MS } from "../config/runtimeConfig.js";
 import { PROVIDER_MEDIA } from "../providers/index.js";
+import { getModelUpstreamId } from "../config/providerModels.js";
 import { generateSessionId } from "../executors/opencode-zen.js";
+
+const OPENCODE_PROVIDERS = new Set(["opencode", "opencode-zen"]);
+
+/**
+ * Resolve the System One URL. A saved host override is joined with the registry
+ * `path` (e.g. "/v1/systemone") without doubling a "/v1" or "/v1/systemone" the
+ * user already included. Without `path`, the override is used as a full URL.
+ */
+export function buildSystemoneUrl(override, cfg) {
+  const base = override?.trim();
+  if (!base) return cfg?.baseUrl;
+  if (!cfg?.path) return base;
+  const host = base.replace(/\/+$/, "");
+  const path = cfg.path.replace(/\/+$/, "");
+  if (host.endsWith(path)) return host;
+  const prefix = path.slice(0, path.lastIndexOf("/"));
+  if (prefix && host.endsWith(prefix)) return host + path.slice(prefix.length);
+  return host + path;
+}
 
 /**
  * Core System One (Jev) handler — native decision payload pass-through.
@@ -19,12 +39,26 @@ export async function handleSystemoneCore({
 }) {
   const { provider, model } = modelInfo;
   const cfg = PROVIDER_MEDIA[provider]?.systemoneConfig;
-  const targetUrl = credentials?.providerSpecificData?.baseUrl || cfg?.baseUrl;
+  let targetUrl = buildSystemoneUrl(credentials?.providerSpecificData?.baseUrl, cfg);
   if (!targetUrl) {
     return createErrorResult(
       HTTP_STATUS.BAD_REQUEST,
       `Provider '${provider}' does not support System One.`
     );
+  }
+  // Cloudflare-style endpoints embed the account and model in the path.
+  if (targetUrl.includes("{accountId}")) {
+    const accountId = credentials?.providerSpecificData?.accountId;
+    if (!accountId) {
+      return createErrorResult(
+        HTTP_STATUS.BAD_REQUEST,
+        `Provider '${provider}' requires accountId in providerSpecificData.`
+      );
+    }
+    targetUrl = targetUrl.replace("{accountId}", accountId);
+  }
+  if (targetUrl.includes("{model}")) {
+    targetUrl = targetUrl.replace(/\{model\}/g, model);
   }
 
   // Validate input at the trust boundary; question-level shape is upstream's job.
@@ -41,10 +75,11 @@ export async function handleSystemoneCore({
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(cfg.headers || {}),
-    // Zen lanes expect the official client session header on every request.
-    "x-opencode-session": generateSessionId(),
+    // Zen lanes expect the official client session header; other providers don't need it.
+    ...(OPENCODE_PROVIDERS.has(provider) ? { "x-opencode-session": generateSessionId() } : {}),
   };
-  const requestBody = { ...body, model };
+  // Cloudflare validates the body model as a short selector (e.g. "clef-flash"), not the full id.
+  const requestBody = { ...body, model: getModelUpstreamId(provider, model) || model };
 
   log?.debug?.("SYSTEMONE", `${provider.toUpperCase()} | ${model}`);
 
