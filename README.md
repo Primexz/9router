@@ -5,6 +5,16 @@
 
 The following changes are included in this fork's `master` branch, on top of the upstream project.
 
+### Fork Docker image
+
+The **Publish Fork Image to GHCR** GitHub Actions workflow builds Linux AMD64 and ARM64 images on every push to `master`, and can also be run manually from the Actions tab. It publishes to `ghcr.io/primexz/9router` using the built-in `GITHUB_TOKEN`; no registry secrets are required. Images receive a `sha-<full-commit>` tag and a branch tag. Builds from `master` also update `latest`. Tagged releases continue to use the existing release workflow.
+
+```bash
+docker pull ghcr.io/primexz/9router:latest
+```
+
+GitHub Actions must be enabled for this fork. To allow unauthenticated pulls, set the GHCR package's visibility to public after its first publication.
+
 ### GitHub Copilot
 
 - **AI Credits tracking:** Show GitHub-reported credit consumption, billing mode, remaining allowances, and reset dates. Credit consumption is displayed separately from budget percentages, including for unlimited organization plans. Hide redundant unlimited request rows and unallocated premium quotas without hiding exhausted allowances.
