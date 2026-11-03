@@ -432,16 +432,16 @@ export default function ProvidersPage() {
 
       {/* Custom Providers (OpenAI/Anthropic Compatible) — dynamic */}
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2 leading-tight">
             Custom Providers (OpenAI/Anthropic Compatible){" "}
           </h2>
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:w-auto">
+          <div className="flex flex-wrap gap-2 sm:w-auto">
             <Button
               size="sm"
               icon="add"
               onClick={() => setShowAddAnthropicCompatibleModal(true)}
-              className="w-full sm:w-auto"
+              className="w-full shrink-0 whitespace-nowrap sm:w-auto"
             >
               Add Anthropic Compatible
             </Button>
@@ -450,7 +450,7 @@ export default function ProvidersPage() {
               variant="secondary"
               icon="add"
               onClick={() => setShowAddCompatibleModal(true)}
-              className="w-full !bg-white !text-black hover:!bg-gray-100 sm:w-auto"
+              className="w-full shrink-0 whitespace-nowrap !bg-white !text-black hover:!bg-gray-100 sm:w-auto"
             >
               Add OpenAI Compatible
             </Button>
