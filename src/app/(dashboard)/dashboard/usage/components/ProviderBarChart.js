@@ -82,12 +82,15 @@ export default function ProviderBarChart({ byProvider }) {
               width={44}
             />
             <Tooltip
+              cursor={{ className: "dark:fill-surface-3 dark:stroke-surface-3" }}
               contentStyle={{
                 backgroundColor: "var(--color-bg)",
+                color: "var(--color-text)",
                 border: "1px solid var(--color-border)",
                 borderRadius: "8px",
                 fontSize: "12px",
               }}
+              itemStyle={{ color: "var(--color-text)" }}
               formatter={(value) => [fmt(value), label]}
             />
             <Bar dataKey={viewMode} radius={[4, 4, 0, 0]}>
