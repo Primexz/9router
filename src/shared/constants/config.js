@@ -107,3 +107,11 @@ export {
   PROVIDER_MODELS,
   AI_MODELS,
 } from "./models.js";
+
+// Opt-in Codex reset credit redemption near expiry.
+export const CODEX_AUTO_RESET_CONFIG = {
+  discoveryIntervalMs: 24 * 60 * 60000,
+  maxTimeoutMs: 2 ** 31 - 1, // Node timers overflow above this delay.
+  retryIntervalMs: 60000,
+  expiryLeadMs: 15 * 60000,
+};

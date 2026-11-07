@@ -24,6 +24,7 @@ import AddCustomModelModal from "./AddCustomModelModal";
 import BulkImportCodexModal from "./BulkImportCodexModal";
 import BulkImportGrokCliModal from "./BulkImportGrokCliModal";
 import CustomConfigCard from "./CustomConfigCard";
+import { useCodexAutoReset } from "@/shared/components/CodexAutoResetToggle";
 import AutoPingScheduleModal from "./AutoPingScheduleModal";
 import WebLoginButton, { WEB_LOGIN_PROVIDERS } from "../components/WebLoginButton.js";
 import MinimaxLeaseButton from "../components/MinimaxLeaseButton.js";
@@ -75,6 +76,7 @@ export default function ProviderDetailPage() {
   const [providerStrategy, setProviderStrategy] = useState(null);
   const [providerStickyLimit, setProviderStickyLimit] = useState("");
   const [thinkingMode, setThinkingMode] = useState("auto");
+  const autoResetControl = useCodexAutoReset();
   const [autoPing, setAutoPing] = useState({ enabled: false, connections: {}, schedules: {} });
   const [scheduleConnection, setScheduleConnection] = useState(null);
   const [suggestedModels, setSuggestedModels] = useState([]);
@@ -1058,6 +1060,7 @@ export default function ProviderDetailPage() {
             </div>
             <div className="flex-1 min-w-0">
               <ConnectionRow
+                autoResetControl={autoResetControl}
                 connection={conn}
                 proxyPools={proxyPools}
                 isOAuth={isOAuth}

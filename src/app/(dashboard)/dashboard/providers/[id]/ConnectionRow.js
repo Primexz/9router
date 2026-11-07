@@ -1,5 +1,7 @@
 "use client";
 
+import CodexAutoResetToggle from "@/shared/components/CodexAutoResetToggle";
+
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { getStatusVariant as getConnectionStatusVariant } from "@/shared/utils/connectionStatus";
@@ -7,7 +9,7 @@ import PropTypes from "prop-types";
 import { Badge, Toggle, Tooltip } from "@/shared/components";
 import CooldownTimer from "./CooldownTimer";
 
-export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst, isLast, onMoveUp, onMoveDown, onToggleActive, onUpdateProxy, onEdit, onDelete, oneByOneStatus = null, autoPing = null, fastMode = null }) {
+export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst, isLast, onMoveUp, onMoveDown, onToggleActive, onUpdateProxy, onEdit, onDelete, oneByOneStatus = null, autoPing = null, fastMode = null, autoResetControl = null }) {
   const [showProxyDropdown, setShowProxyDropdown] = useState(false);
   const [updatingProxy, setUpdatingProxy] = useState(false);
   const [updatingFastMode, setUpdatingFastMode] = useState(false);
@@ -328,6 +330,7 @@ export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst
               </button>
             </Tooltip>
           )}
+          {autoResetControl && <CodexAutoResetToggle connection={connection} control={autoResetControl} />}
           {autoPing && (
             <Tooltip text={autoPingTooltip}>
               <button
@@ -392,6 +395,7 @@ ConnectionRow.propTypes = {
     state: PropTypes.string,
     error: PropTypes.string,
   }),
+  autoResetControl: PropTypes.object,
   autoPing: PropTypes.shape({
     isActive: PropTypes.bool,
     provider: PropTypes.string,

@@ -113,6 +113,12 @@ export async function PATCH(request) {
         .catch((error) => console.warn("[AutoPing] settings update failed:", error.message));
     }
 
+    if (Object.prototype.hasOwnProperty.call(body, "codexAutoReset")) {
+      import("@/shared/services/codexAutoReset")
+        .then(({ configureCodexAutoReset }) => configureCodexAutoReset(settings))
+        .catch((error) => console.warn("[CodexAutoReset] settings update failed:", error.message));
+    }
+
     const { password, oidcClientSecret, ...safeSettings } = settings;
     safeSettings.oidcConfigured = !!(safeSettings.oidcIssuerUrl && safeSettings.oidcClientId && oidcClientSecret);
     return NextResponse.json(safeSettings, { headers: SETTINGS_RESPONSE_HEADERS });

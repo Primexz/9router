@@ -41,6 +41,7 @@ import {
 } from "./utils";
 import Card from "@/shared/components/Card";
 import { ConfirmModal, EditConnectionModal } from "@/shared/components";
+import CodexAutoResetToggle, { useCodexAutoReset } from "@/shared/components/CodexAutoResetToggle";
 import AutoPingScheduleModal from "@/app/(dashboard)/dashboard/providers/[id]/AutoPingScheduleModal";
 import { getScheduleSlotLabels } from "@/shared/services/quotaPingSchedule";
 import { USAGE_SUPPORTED_PROVIDERS, AI_PROVIDERS } from "@/shared/constants/providers";
@@ -163,6 +164,7 @@ export default function ProviderLimits() {
   const [loading, setLoading] = useState({});
   const [errors, setErrors] = useState({});
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const autoResetControl = useCodexAutoReset();
   const [autoPingConfigs, setAutoPingConfigs] = useState({ claude: {}, codex: {} });
   const [scheduleConnection, setScheduleConnection] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -1305,6 +1307,7 @@ export default function ProviderLimits() {
                         </Tooltip>}
                       </>
                     )}
+                    <CodexAutoResetToggle connection={conn} control={autoResetControl} />
                     {AUTO_PING_SETTINGS_KEYS[conn.provider] && conn.authType === "oauth" && (() => {
                       const cfg = autoPingConfigs[conn.provider] || {};
                       const isReactive = cfg.connections?.[conn.id] === true;

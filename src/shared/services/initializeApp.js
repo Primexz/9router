@@ -107,6 +107,12 @@ async function runHeavyStartup() {
 
   configureTunnelMonitoring(settings);
 
+  if (Object.values(settings?.codexAutoReset?.connections || {}).some((value) => value === true)) {
+    import("@/shared/services/codexAutoReset")
+      .then(({ configureCodexAutoReset }) => configureCodexAutoReset(settings))
+      .catch((error) => console.warn("[CodexAutoReset] startup failed:", error.message));
+  }
+
   if (hasQuotaAutoPingEnabled(settings)) {
     import("@/shared/services/quotaAutoPing")
       .then(({ startQuotaAutoPing }) => startQuotaAutoPing())

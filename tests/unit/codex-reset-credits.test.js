@@ -206,4 +206,48 @@ describe("Codex reset credits", () => {
       expect.objectContaining({ strictProxy: false }),
     );
   });
+  it("POST preserves successful manual apply without auto-reset enabled", async () => {
+    const connection = { id: "manual", provider: "codex", authType: "access_token", accessToken: "manual-token" };
+    mocks.getProviderConnectionById.mockResolvedValue(connection);
+    mocks.consumeCodexRateLimitResetCredit.mockResolvedValue({ ok: true, code: "reset", windowsReset: 2, raw: { credit: { status: "redeemed" } } });
+    const { POST } = await import("../../src/app/api/usage/[connectionId]/codex-reset-credits/route.js");
+    const response = await POST(new Request("http://localhost/api/usage/manual/codex-reset-credits", { method: "POST" }), {
+      params: Promise.resolve({ connectionId: "manual" }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ code: "reset", reset: true, windows_reset: 2, redeemRequestId: expect.any(String), credit: { status: "redeemed" } });
+    expect(mocks.consumeCodexRateLimitResetCredit).toHaveBeenCalledWith("manual-token", expect.any(String), expect.any(Object));
+  });
+
+  it("POST notifies the running scheduler after successful manual apply", async () => {
+    const previousState = global.__codexAutoReset;
+    const invalidate = vi.fn();
+    global.__codexAutoReset = { invalidate };
+    try {
+      mocks.getProviderConnectionById.mockResolvedValue({ id: "manual", provider: "codex", authType: "access_token", accessToken: "token" });
+      mocks.consumeCodexRateLimitResetCredit.mockResolvedValue({ ok: true, code: "reset", windowsReset: 1 });
+      const { POST } = await import("../../src/app/api/usage/[connectionId]/codex-reset-credits/route.js");
+      const response = await POST(new Request("http://localhost/api/usage/manual/codex-reset-credits", { method: "POST" }), {
+        params: Promise.resolve({ connectionId: "manual" }),
+      });
+      expect(response.status).toBe(200);
+      expect(invalidate).toHaveBeenCalledWith("manual");
+    } finally {
+      global.__codexAutoReset = previousState;
+    }
+  });
+
+  it("POST preserves the upstream auth response if force refresh fails", async () => {
+    const connection = { id: "manual", provider: "codex", authType: "oauth", accessToken: "old", refreshToken: "refresh" };
+    mocks.getProviderConnectionById.mockResolvedValue(connection);
+    mocks.refreshAndUpdateCredentials.mockResolvedValueOnce({ connection }).mockRejectedValueOnce(new Error("refresh unavailable"));
+    mocks.consumeCodexRateLimitResetCredit.mockResolvedValue({ ok: false, status: 401, code: "unauthorized", message: "expired", windowsReset: 0 });
+    const { POST } = await import("../../src/app/api/usage/[connectionId]/codex-reset-credits/route.js");
+    const response = await POST(new Request("http://localhost/api/usage/manual/codex-reset-credits", { method: "POST" }), {
+      params: Promise.resolve({ connectionId: "manual" }),
+    });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ reset: false, code: "unauthorized", message: "expired" });
+  });
+
 });
