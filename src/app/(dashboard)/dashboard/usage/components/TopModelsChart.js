@@ -89,12 +89,15 @@ export default function TopModelsChart({ byModel }) {
               width={90}
             />
             <Tooltip
+              cursor={{ className: "dark:fill-surface-3 dark:stroke-surface-3" }}
               contentStyle={{
                 backgroundColor: "var(--color-bg)",
+                color: "var(--color-text)",
                 border: "1px solid var(--color-border)",
                 borderRadius: "8px",
                 fontSize: "12px",
               }}
+              itemStyle={{ color: "var(--color-text)" }}
               formatter={(value) => [fmt(value), label]}
             />
             <Bar dataKey={viewMode} radius={[0, 4, 4, 0]}>
